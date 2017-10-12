@@ -152,10 +152,14 @@ def load_backups(name: str) -> typing.List[Backup]:
 # main program
 if __name__ == '__main__':
     # parse command line arguments
-    parser = argparse.ArgumentParser(description='Perform rsync based incremental backups')
-    parser.add_argument('--tz', type=str, default='UTC', help='Current server timezone (default: UTC)')
-    parser.add_argument('--conf', type=str, default='/etc/rbt', help='Configuration directory (default: /etc/rbt)')
-    parser.add_argument('--servers', type=str, action='append', required=True, help='Provide servers configuration')
+    parser = argparse.ArgumentParser(
+        description='Perform rsync based incremental backups')
+    parser.add_argument('--tz', type=str, default='UTC',
+                        help='Current server timezone (default: UTC)')
+    parser.add_argument('--prefix', type=str, default='/etc/rbt',
+                        help='Configuration directory (default: /etc/rbt)')
+    parser.add_argument('--config', type=str, action='append', required=True,
+                        help='Specify one or more configuration files')
     args = parser.parse_args()
 
     # walk all configuration files
