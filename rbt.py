@@ -112,7 +112,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # walk all configuration files
-    for config in args.config:
+    for config in args.servers:
         # look for configuration file
         if not config.endswith('.yaml'):
             config = '{0}.yaml'.format(config)
