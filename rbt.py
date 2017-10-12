@@ -163,12 +163,12 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # walk all configuration files
-    for config in args.servers:
+    for config in args.config:
         # look for configuration file
         if not config.endswith('.yaml'):
             config = '{0}.yaml'.format(config)
         if not os.path.exists(config):
-            config = '{0}/{1}'.format(args.conf, config)
+            config = '{0}/{1}'.format(args.prefix, config)
         if not os.path.exists(config):
             print('ERROR: Configuration file {0} does not exist.'.format(config))
             continue
