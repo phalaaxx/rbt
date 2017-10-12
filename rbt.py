@@ -15,16 +15,50 @@ import yaml
 BackupProperties = dict(name=None, target=None, backups=28, files=None, exclude=None, fakesuper=False, chown=None)
 
 
+class FileLock(object):
+    """Implement simple file locking"""
+
+    def __init__(self, name: str) -> None:
+        """Class constructor"""
+        self.name = name
+        self.acquired = False
+
+    def __enter__(self) -> 'FileLock':
+        """Acquire lock"""
+        if self.acquired:
+            return self
+        #  make sure process is not already running
+        if os.path.exists(self.name):
+            try:
+                pid = int(open(self.name, 'r').read())
+                try:
+                    os.kill(pid, 0)
+                    return self
+                except OSError:
+                    pass
+            except ValueError:
+                pass
+        # acquire lock
+        with open(self.name, 'w+') as fh:
+            fh.write(str(os.getpid()))
+            self.acquired = True
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Release acquired lock"""
+        if self.acquired:
+            os.unlink(self.name)
+            self.acquired = False
+
+
 class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
     """Backup object represents a backup job and its properties"""
 
-    # latest_dir returns full path to last backup directory
     @property
     def latest_dir(self) -> str:
         """Get the full path to the directory of the latest backup"""
         return '{0}/backup.0'.format(self.target)
 
-    # target_dir returns target backup directory for rsync
     @property
     def target_dir(self) -> str:
         """Get the full path to the directory where next backup will go before rotation"""
@@ -34,6 +68,11 @@ class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
     def last_completed(self):
         """Get full name of completed file in last performed backup"""
         return '{0}/completed'.format(self.latest_dir)
+
+    @property
+    def lock_file_name(self):
+        """Get the name of a lock file for current backup"""
+        return '{0}/backup.lock'.format(self.target)
 
     @property
     def options(self) -> typing.List[str]:
@@ -123,4 +162,7 @@ if __name__ == '__main__':
             continue
         # run backup job
         for backup in load_backups(config):
-            backup.run()
+            with FileLock(backup.lock_file_name) as lock:
+                if not lock.acquired:
+                    continue
+                backup.run()
