@@ -10,26 +10,30 @@ A sample yaml configuration file looks like this - server.hostname.com.yaml:
 
 ```yaml
 ---
+- templates:
+  - name: default
+    backups: 28
+    files:
+      - /etc
+
 - servers:
   - name: server.hostname.com
-    - backups: 182
-    - target: /backup/webservers/{name}
-    - files:
+    backups: 182
+    target: /backup/webservers/{name}
+    files:
       - /opt
       - /etc
       - /var
       - /home
       - /root
       - /backup
-    - exclude:
+    exclude:
       - /var/lib/mysql
       - /var/lib/postgresql
 
   - name: server2.hostname.com
-    - backups: 28
-    - target: /backup/customers/{name}
-    - files:
-      - /etc
+    template: default
+    target: /backup/customers/{name}
 ```
 
 Configuration file names are provided with -f command line option. It is possible to provide more than one file to sequentially run backups on multiple servers:
