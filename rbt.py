@@ -55,7 +55,7 @@ class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
         """Rotate backups to move latest backup in backup.0 directory"""
         # move target backup out of the way by renaming to backup.tmp
         temp_dir = '{0}/backup.tmp'.format(self.target)
-        os.rename(self.target, temp_dir)
+        os.rename(self.target_dir, temp_dir)
         # rotate backups
         for idx in range(self.backups - 1, -1, -1):
             src = '{0}/backup.{1}'.format(self.target, idx)
@@ -117,7 +117,7 @@ if __name__ == '__main__':
         if not config.endswith('.yaml'):
             config = '{0}.yaml'.format(config)
         if not os.path.exists(config):
-            config = '{0}/{1}'.format(args.confdir, config)
+            config = '{0}/{1}'.format(args.conf, config)
         if not os.path.exists(config):
             print('ERROR: Configuration file {0} does not exist.'.format(config))
             continue
