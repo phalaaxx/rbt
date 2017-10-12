@@ -160,6 +160,7 @@ if __name__ == '__main__':
                         help='Configuration directory (default: /etc/rbt)')
     parser.add_argument('--config', type=str, action='append', required=True,
                         help='Specify one or more configuration files')
+    parser.add_argument('--server', type=str, help='Backup only specified server')
     args = parser.parse_args()
 
     # walk all configuration files
@@ -174,6 +175,8 @@ if __name__ == '__main__':
             continue
         # run backup job
         for backup in load_backups(config):
+            if args.server and args.server != backup.name:
+                continue
             with FileLock(backup.lock_file_name) as lock:
                 if not lock.acquired:
                     continue
