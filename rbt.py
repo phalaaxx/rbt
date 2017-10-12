@@ -20,6 +20,12 @@ BackupProperties = dict(name=None, template=None, target=None, backups=28,
                         files=None, exclude=None, fakesuper=False, chown=None)
 
 
+def verbose_print(msg: str, *args: list, **kwargs: dict) -> None:
+    """Print message if verbose flag has been set"""
+    if cmd_args.verbose:
+        print(msg, *args, **kwargs)
+
+
 class FileLock(object):
     """Implement simple file locking"""
 
@@ -117,6 +123,7 @@ class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
                 os.makedirs(backup_dir)
         # get start time for later reference
         start = time.time()
+        verbose_print('Starting command: {0}'.format(' '.join(self.options)))
         rsync = subprocess.run(self.options, stdout=subprocess.PIPE)
         if rsync.returncode not in (24,):
             rsync.check_returncode()
@@ -125,7 +132,7 @@ class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
         with open(self.last_completed, 'w+') as fh:
             data = dict(
                 name=self.name,
-                timestamp=datetime.datetime.now(pytz.timezone(args.tz)).isoformat(),
+                timestamp=datetime.datetime.now(pytz.timezone(cmd_args.tz)).isoformat(),
                 duration=time.time() - start,
             )
             fh.write(yaml.dump(data, default_flow_style=False))
@@ -165,23 +172,29 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=str, action='append', required=True,
                         help='Specify one or more configuration files')
     parser.add_argument('--server', type=str, help='Backup only specified server')
-    args = parser.parse_args()
+    parser.add_argument('--verbose', action='store_true',
+                        help='Print debug info to stdout')
+    cmd_args = parser.parse_args()
 
     # walk all configuration files
-    for config in args.config:
+    for config in cmd_args.config:
         # look for configuration file
         if not config.endswith('.yaml'):
             config = '{0}.yaml'.format(config)
         if not os.path.exists(config):
-            config = '{0}/{1}'.format(args.prefix, config)
+            config = '{0}/{1}'.format(cmd_args.prefix, config)
         if not os.path.exists(config):
             print('ERROR: Configuration file {0} does not exist.'.format(config))
             continue
         # run backup job
         for backup in load_backups(config):
-            if args.server and args.server != backup.name:
+            if cmd_args.server and cmd_args.server != backup.name:
+                if cmd_args.verbose:
+                    verbose_print('Skipping {0}'.format(backup.name))
                 continue
             with FileLock(backup.lock_file_name) as lock:
                 if not lock.acquired:
+                    verbose_print('Unable to acquire lock for {0}'.format(backup.name))
                     continue
+                verbose_print('Starting backup {0}'.format(backup.name))
                 backup.run()
