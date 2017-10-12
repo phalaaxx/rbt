@@ -12,7 +12,8 @@ import pytz
 import yaml
 
 # BackupProperties defines standard set of backup configuration properties
-BackupProperties = dict(name=None, target=None, backups=28, files=None, exclude=None, fakesuper=False, chown=None)
+BackupProperties = dict(name=None, template=None, target=None, backups=28,
+                        files=None, exclude=None, fakesuper=False, chown=None)
 
 
 class FileLock(object):
@@ -27,7 +28,7 @@ class FileLock(object):
         """Acquire lock"""
         if self.acquired:
             return self
-        #  make sure process is not already running
+        # make sure process is not already running
         if os.path.exists(self.name):
             try:
                 pid = int(open(self.name, 'r').read())
@@ -129,15 +130,22 @@ class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
 def load_backups(name: str) -> typing.List[Backup]:
     """Load backup specification from the named file and return Backup object"""
     backups = []
+    templates = {}
     with open(name, 'r') as fh:
-        for yaml_all in yaml.load(fh.read()):
-            for yaml_doc in yaml_all.get('servers', []):
-                yaml_data = dict(BackupProperties)
-                yaml_data.update(**yaml_doc)
-                for k, v in yaml_data.items():
+        for items in yaml.load(fh.read()):
+            # parse templates
+            for template in items.get('templates', []):
+                templates[template.get('name')] = template
+            # parse backups
+            for backup_item in items.get('servers', []):
+                backup_config = dict(BackupProperties)
+                if backup_item.get('template'):
+                    backup_config.update(templates.get(backup_item.get('template', {})))
+                backup_config.update(**backup_item)
+                for k, v in backup_config.items():
                     if type(v) == str:
-                        yaml_data[k] = str(v).format(**yaml_data)
-                backups.append(Backup(**yaml_data))
+                        backup_config[k] = str(v).format(**backup_config)
+                backups.append(Backup(**backup_config))
     return backups
 
 
