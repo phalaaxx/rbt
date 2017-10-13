@@ -16,7 +16,7 @@ import pytz
 import yaml
 
 # BackupProperties defines standard set of backup configuration properties
-BackupProperties = dict(name=None, template=None, target=None, backups=28,
+BackupProperties = dict(name=None, template=None, target=None, backups=28, enabled=True,
                         files=None, exclude=None, fakesuper=False, chown=None)
 
 
@@ -187,7 +187,7 @@ if __name__ == '__main__':
             print('ERROR: Configuration file {0} does not exist.'.format(config))
             continue
         # run backup job
-        for backup in load_backups(config):
+        for backup in filter(lambda b: b.enabled, load_backups(config)):
             if cmd_args.server and cmd_args.server != backup.name:
                 if cmd_args.verbose:
                     verbose_print('Skipping {0}'.format(backup.name))
