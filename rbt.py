@@ -88,7 +88,7 @@ class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
     @property
     def options(self) -> typing.List[str]:
         """Generate list of options used to start rsync sub-process"""
-        opts = ['/usr/bin/rsync', '-aR', '--delete', '--stats']
+        opts = ['/usr/bin/rsync', '-aRH', '--delete', '--stats']
         if self.fakesuper:
             opts.append('--fake-super')
         if self.chown:
