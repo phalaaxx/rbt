@@ -71,6 +71,11 @@ class BackupDir(str):
     """Generate full path to backup related resources"""
 
     @property
+    def files(self) -> str:
+        """Return full path to files backups directory"""
+        return '{0}/files'.format(self)
+
+    @property
     def completed(self) -> str:
         """Get full path to completed file name"""
         return '{0}/completed'.format(self)
@@ -97,12 +102,12 @@ class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
             opts.append('--fake-super')
         if self.chown:
             opts.append('--chown={0}'.format(self.chown))
-        opts.append('--link-dest={0}'.format(self.latest_dir))
+        opts.append('--link-dest={0}'.format(self.latest_dir.files))
         for include in self.files or []:
             opts.append('root@{0}:{1}'.format(self.name, include))
         for exclude in self.exclude or []:
             opts.append('--exclude={0}'.format(exclude))
-        opts.append(self.target_dir)
+        opts.append(self.target_dir.files)
         return opts
 
     def rotate(self) -> None:
@@ -127,6 +132,9 @@ class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
                 os.makedirs(backup_dir)
         # get start time for later reference
         start = time.time()
+        # make sure there is a target directory for files backups
+        if not os.path.isdir(backup.target_dir.files):
+            os.makedirs(backup.target_dir.files)
         verbose_print('Starting command: {0}'.format(' '.join(self.options)))
         rsync = subprocess.run(self.options, stdout=subprocess.PIPE)
         if rsync.returncode not in (24,):
