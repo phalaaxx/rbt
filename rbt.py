@@ -17,13 +17,18 @@ import yaml
 
 # BackupProperties defines standard set of backup configuration properties
 BackupProperties = dict(name=None, template=None, target=None, backups=28, enabled=True,
-                        files=None, exclude=None, fakesuper=False, chown=None)
+                        files=None, exclude=None, fakesuper=False, chown=None, mysql=None)
 
 
 def verbose_print(msg: str, *args: list, **kwargs: dict) -> None:
     """Print message if verbose flag has been set"""
     if cmd_args.verbose:
         print(msg, *args, **kwargs)
+
+
+def lock_file(path: str) -> str:
+    """Get full path to lock file name"""
+    return '{0}/backup.lock'.format(path)
 
 
 class FileLock(object):
@@ -62,28 +67,27 @@ class FileLock(object):
             self.acquired = False
 
 
+class BackupDir(str):
+    """Generate full path to backup related resources"""
+
+    @property
+    def completed(self) -> str:
+        """Get full path to completed file name"""
+        return '{0}/completed'.format(self)
+
+
 class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
     """Backup object represents a backup job and its properties"""
 
     @property
-    def latest_dir(self) -> str:
+    def latest_dir(self) -> BackupDir:
         """Get the full path to the directory of the latest backup"""
-        return '{0}/backup.0'.format(self.target)
+        return BackupDir('{0}/backup.0'.format(self.target))
 
     @property
-    def target_dir(self) -> str:
+    def target_dir(self) -> BackupDir:
         """Get the full path to the directory where next backup will go before rotation"""
-        return '{0}/backup.{1}'.format(self.target, self.backups)
-
-    @property
-    def last_completed(self):
-        """Get full name of completed file in last performed backup"""
-        return '{0}/completed'.format(self.latest_dir)
-
-    @property
-    def lock_file_name(self):
-        """Get the name of a lock file for current backup"""
-        return '{0}/backup.lock'.format(self.target)
+        return BackupDir('{0}/backup.{1}'.format(self.target, self.backups))
 
     @property
     def options(self) -> typing.List[str]:
@@ -129,7 +133,7 @@ class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
             rsync.check_returncode()
         self.rotate()
         # save statistics from the backup job
-        with open(self.last_completed, 'w+') as fh:
+        with open(self.latest_dir.completed, 'w+') as fh:
             data = dict(
                 name=self.name,
                 timestamp=datetime.datetime.now(pytz.timezone(cmd_args.tz)).isoformat(),
@@ -192,7 +196,7 @@ if __name__ == '__main__':
                 if cmd_args.verbose:
                     verbose_print('Skipping {0}'.format(backup.name))
                 continue
-            with FileLock(backup.lock_file_name) as lock:
+            with FileLock(lock_file(backup.target)) as lock:
                 if not lock.acquired:
                     verbose_print('Unable to acquire lock for {0}'.format(backup.name))
                     continue
