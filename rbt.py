@@ -137,8 +137,8 @@ class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
             os.makedirs(backup.target_dir.files)
         verbose_print('Starting command: {0}'.format(' '.join(self.options)))
         rsync = subprocess.run(self.options, stdout=subprocess.PIPE)
-        if rsync.returncode not in (24,):
-            print('[0] ERROR: return code {1}'.format(self.name, rsync.returncode))
+        if rsync.returncode not in (0, 24):
+            print('[{0}] Return code {1}'.format(self.name, rsync.returncode))
         self.rotate()
         # save statistics from the backup job
         with open(self.latest_dir.completed, 'w+') as fh:
