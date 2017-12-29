@@ -16,7 +16,7 @@ import pytz
 import yaml
 
 # BackupProperties defines standard set of backup configuration properties
-BackupProperties = dict(name=None, template=None, target=None, backups=28, enabled=True,
+BackupProperties = dict(name=None, user='root', template=None, target=None, backups=28, enabled=True,
                         files=None, exclude=None, fakesuper=False, chown=None, mysql=None)
 
 
@@ -104,7 +104,7 @@ class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
             opts.append('--chown={0}'.format(self.chown))
         opts.append('--link-dest={0}'.format(self.latest_dir.files))
         for include in self.files or []:
-            opts.append('root@{0}:{1}'.format(self.name, include))
+            opts.append('{0}@{1}:{2}'.format(self.user, self.name, include))
         for exclude in self.exclude or []:
             opts.append('--exclude={0}'.format(exclude))
         opts.append(self.target_dir.files)
