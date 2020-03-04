@@ -104,7 +104,10 @@ class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
             opts.append('--chown={0}'.format(self.chown))
         opts.append('--link-dest={0}'.format(self.latest_dir.files))
         for include in self.files or []:
-            opts.append('{0}@{1}:{2}'.format(self.user, self.name, include))
+            if self.name == 'localhost':
+                opts.append(include)
+            else:
+                opts.append('{0}@{1}:{2}'.format(self.user, self.name, include))
         for exclude in self.exclude or []:
             opts.append('--exclude={0}'.format(exclude))
         opts.append(self.target_dir.files)
