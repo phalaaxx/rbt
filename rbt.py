@@ -15,9 +15,23 @@ import typing
 import pytz
 import yaml
 
+# ConfigOptions defines possible configuration options
+ConfigOptions = (
+    'name',
+    'user',
+    'template',
+    'target',
+    'backups',
+    'enabled',
+    'files',
+    'exclude',
+    'fakesuper',
+    'chown',
+    'mysql',
+)
+
 # BackupProperties defines standard set of backup configuration properties
-BackupProperties = dict(name=None, user='root', template=None, target=None, backups=28, enabled=True,
-                        files=None, exclude=None, fakesuper=False, chown=None, mysql=None)
+BackupProperties = {opt: None for opt in ConfigOptions}
 
 
 def verbose_print(msg: str, *args: list, **kwargs: dict) -> None:
@@ -81,7 +95,7 @@ class BackupDir(str):
         return '{0}/completed'.format(self)
 
 
-class Backup(collections.namedtuple('Backup', BackupProperties.keys())):
+class Backup(collections.namedtuple('Backup', ConfigOptions)):
     """Backup object represents a backup job and its properties"""
 
     @property
