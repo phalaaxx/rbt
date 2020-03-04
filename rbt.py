@@ -32,6 +32,7 @@ ConfigOptions = (
 
 # BackupProperties defines standard set of backup configuration properties
 BackupProperties = {opt: None for opt in ConfigOptions}
+BackupProperties.update(dict(enabled=True))
 
 
 def verbose_print(msg: str, *args: list, **kwargs: dict) -> None:
