@@ -8,6 +8,7 @@ import argparse
 import collections
 import datetime
 import os
+import pwd
 import subprocess
 import time
 import typing
@@ -111,6 +112,11 @@ class Backup(collections.namedtuple('Backup', ConfigOptions)):
         return BackupDir('{0}/backup.{1}'.format(self.target, self.backups))
 
     @property
+    def username(self) -> str:
+        """Returns default username to use in connection"""
+        return self.user or pwd.getpwuid(os.getuid()).pw_name
+
+    @property
     def options(self) -> typing.List[str]:
         """Generate list of options used to start rsync sub-process"""
         opts = ['/usr/bin/rsync', '-aRH', '--delete', '--stats']
@@ -125,7 +131,7 @@ class Backup(collections.namedtuple('Backup', ConfigOptions)):
             if self.name == 'localhost':
                 opts.append(include)
             else:
-                opts.append('{0}@{1}:{2}'.format(self.user, self.name, include))
+                opts.append('{0}@{1}:{2}'.format(self.username, self.name, include))
         for exclude in self.exclude or []:
             opts.append('--exclude={0}'.format(exclude))
         opts.append(self.target_dir.files)
