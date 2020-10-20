@@ -28,6 +28,7 @@ ConfigOptions = (
     'fakesuper',
     'chown',
     'mysql',
+    'bwlimit',
 )
 
 # BackupProperties defines standard set of backup configuration properties
@@ -117,6 +118,8 @@ class Backup(collections.namedtuple('Backup', ConfigOptions)):
             opts.append('--fake-super')
         if self.chown:
             opts.append('--chown={0}'.format(self.chown))
+        if self.bwlimit:
+            opts.append('--bwlimit={0}'.format(self.bwlimit))
         opts.append('--link-dest={0}'.format(self.latest_dir.files))
         for include in self.files or []:
             if self.name == 'localhost':
