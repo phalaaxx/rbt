@@ -183,7 +183,7 @@ def load_backups(name: str) -> typing.List[Backup]:
     backups = []
     templates = {}
     with open(name, 'r') as fh:
-        for items in yaml.load(fh.read()):
+        for items in yaml.load(fh.read(), Loader=yaml.SafeLoader):
             # parse templates
             for template in items.get('templates', []):
                 templates[template.get('name')] = template
