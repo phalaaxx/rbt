@@ -207,13 +207,16 @@ if __name__ == "__main__":
         description="Perform rsync based incremental backups"
     )
     parser.add_argument(
-        "--tz", type=str, default="UTC", help="Current server timezone (default: UTC)"
+        "--tz",
+        type=str,
+        default="UTC",
+        help="Current server timezone (default: %(default)s)",
     )
     parser.add_argument(
         "--prefix",
         type=str,
         default="/etc/rbt",
-        help="Configuration directory (default: /etc/rbt)",
+        help="Configuration directory (default: %(default)s)",
     )
     parser.add_argument(
         "--config",
