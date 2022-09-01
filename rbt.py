@@ -43,11 +43,6 @@ def verbose_print(msg: str, *args: list, **kwargs: dict) -> None:
         print(msg, *args, **kwargs)
 
 
-def lock_file(path: str) -> str:
-    """Get full path to lock file name"""
-    return f"{path}/backup.lock"
-
-
 class FileLock(object):
     """Implement simple file locking"""
 
@@ -255,7 +250,7 @@ if __name__ == "__main__":
                     if cmd_args.verbose:
                         verbose_print(f"Skipping {backup.name}")
                     continue
-                with FileLock(lock_file(backup.target)) as lock:
+                with FileLock(f"{backup.target}/backup.lock") as lock:
                     if not lock.acquired:
                         verbose_print(f"Unable to acquire lock for {backup.name}")
                         continue
