@@ -206,50 +206,61 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Perform rsync based incremental backups"
     )
-    parser.add_argument(
+    subparser = parser.add_subparsers()
+    backup = subparser.add_parser("backup", help="Perform servers backups")
+    stats = subparser.add_parser("stats", help="Get backups statistics")
+
+    backup.add_argument(
         "--tz",
         type=str,
         default="UTC",
         help="Current server timezone (default: %(default)s)",
     )
-    parser.add_argument(
+    backup.add_argument(
         "--prefix",
         type=str,
         default="/etc/rbt",
         help="Configuration directory (default: %(default)s)",
     )
-    parser.add_argument(
+    backup.add_argument(
         "--config",
         type=str,
         action="append",
         required=True,
         help="Specify one or more configuration files",
     )
-    parser.add_argument("--server", type=str, help="Backup only specified server")
-    parser.add_argument(
+    backup.add_argument("--server", type=str, help="Backup only specified server")
+    backup.add_argument(
         "--verbose", action="store_true", help="Print debug info to stdout"
     )
+
+    # parse arguments
     cmd_args = parser.parse_args()
 
-    # walk all configuration files
-    for config in cmd_args.config:
-        # look for configuration file
-        if not config.endswith(".yaml"):
-            config = f"{config}.yaml"
-        if not os.path.exists(config):
-            config = f"{cmd_args.prefix}/{config}".format(cmd_args.prefix, config)
-        if not os.path.exists(config):
-            print(f"ERROR: Configuration file {config} does not exist.")
-            continue
-        # run backup job
-        for backup in filter(lambda b: b.enabled, load_backups(config)):
-            if cmd_args.server and cmd_args.server != backup.name:
-                if cmd_args.verbose:
-                    verbose_print(f"Skipping {backup.name}")
+    # config is only defined in backup subcommand
+    if "config" in cmd_args:
+        # walk all configuration files
+        for config in cmd_args.config:
+            # look for configuration file
+            if not config.endswith(".yaml"):
+                config = f"{config}.yaml"
+            if not os.path.exists(config):
+                config = f"{cmd_args.prefix}/{config}".format(cmd_args.prefix, config)
+            if not os.path.exists(config):
+                print(f"ERROR: Configuration file {config} does not exist.")
                 continue
-            with FileLock(lock_file(backup.target)) as lock:
-                if not lock.acquired:
-                    verbose_print(f"Unable to acquire lock for {backup.name}")
+            # run backup job
+            for backup in filter(lambda b: b.enabled, load_backups(config)):
+                if cmd_args.server and cmd_args.server != backup.name:
+                    if cmd_args.verbose:
+                        verbose_print(f"Skipping {backup.name}")
                     continue
-                verbose_print(f"Starting backup {backup.name}".format(backup.name))
-                backup.run()
+                with FileLock(lock_file(backup.target)) as lock:
+                    if not lock.acquired:
+                        verbose_print(f"Unable to acquire lock for {backup.name}")
+                        continue
+                    verbose_print(f"Starting backup {backup.name}".format(backup.name))
+                    backup.run()
+    # path is only defined in stats subcommand
+    elif "path" in cmd_args:
+        pass
