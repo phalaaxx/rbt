@@ -45,7 +45,7 @@ def verbose_print(msg: str, *args: list, **kwargs: dict) -> None:
 
 def lock_file(path: str) -> str:
     """Get full path to lock file name"""
-    return "{0}/backup.lock".format(path)
+    return f"{path}/backup.lock"
 
 
 class FileLock(object):
@@ -90,12 +90,12 @@ class BackupDir(str):
     @property
     def files(self) -> str:
         """Return full path to files backups directory"""
-        return "{0}/files".format(self)
+        return f"{self}/files"
 
     @property
     def completed(self) -> str:
         """Get full path to completed file name"""
-        return "{0}/completed".format(self)
+        return f"{self}/completed"
 
 
 class Backup(collections.namedtuple("Backup", ConfigOptions)):
@@ -104,12 +104,12 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
     @property
     def latest_dir(self) -> BackupDir:
         """Get the full path to the directory of the latest backup"""
-        return BackupDir("{0}/backup.0".format(self.target))
+        return BackupDir(f"{self.target}/backup.0")
 
     @property
     def target_dir(self) -> BackupDir:
         """Get the full path to the directory where next backup will go before rotation"""
-        return BackupDir("{0}/backup.{1}".format(self.target, self.backups))
+        return BackupDir(f"{self.target}/backup.{self.backups}")
 
     @property
     def username(self) -> str:
@@ -123,29 +123,29 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
         if self.fakesuper:
             opts.append("--fake-super")
         if self.chown:
-            opts.append("--chown={0}".format(self.chown))
+            opts.append(f"--chown={self.chown}")
         if self.bwlimit:
-            opts.append("--bwlimit={0}".format(self.bwlimit))
-        opts.append("--link-dest={0}".format(self.latest_dir.files))
+            opts.append(f"--bwlimit={self.bwlimit}")
+        opts.append(f"--link-dest={self.latest_dir.files}")
         for include in self.files or []:
             if self.name == "localhost":
                 opts.append(include)
             else:
-                opts.append("{0}@{1}:{2}".format(self.username, self.name, include))
+                opts.append(f"{self.username}@{self.name}:{include}")
         for exclude in self.exclude or []:
-            opts.append("--exclude={0}".format(exclude))
+            opts.append(f"--exclude={exclude}")
         opts.append(self.target_dir.files)
         return opts
 
     def rotate(self) -> None:
         """Rotate backups to move latest backup in backup.0 directory"""
         # move target backup out of the way by renaming to backup.tmp
-        temp_dir = "{0}/backup.tmp".format(self.target)
+        temp_dir = f"{self.target}/backup.tmp"
         os.rename(self.target_dir, temp_dir)
         # rotate backups
         for idx in range(self.backups - 1, -1, -1):
-            src = "{0}/backup.{1}".format(self.target, idx)
-            dst = "{0}/backup.{1}".format(self.target, idx + 1)
+            src = f"{self.target}/backup.{idx}"
+            dst = f"{self.target}/backup.{idx+1}"
             os.rename(src, dst)
         # make target backup last by renaming to backup.0
         os.rename(temp_dir, self.latest_dir)
@@ -154,7 +154,7 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
         """Perform backup with rsync, rotate old backups and save stats"""
         # make sure all backup target directories exist
         for idx in range(self.backups):
-            backup_dir = "{0}/backup.{1}".format(self.target, idx)
+            backup_dir = f"{self.target}/backup.{idx}"
             if not os.path.isdir(backup_dir):
                 os.makedirs(backup_dir)
         # get start time for later reference
@@ -165,7 +165,7 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
         verbose_print("Starting command: {0}".format(" ".join(self.options)))
         rsync = subprocess.run(self.options, stdout=subprocess.PIPE)
         if rsync.returncode not in (0, 24):
-            print("[{0}] Return code {1}".format(self.name, rsync.returncode))
+            print(f"[{self.name}] Return code {rsync.returncode}")
             return
         self.rotate()
         # save statistics from the backup job
@@ -235,21 +235,21 @@ if __name__ == "__main__":
     for config in cmd_args.config:
         # look for configuration file
         if not config.endswith(".yaml"):
-            config = "{0}.yaml".format(config)
+            config = f"{config}.yaml"
         if not os.path.exists(config):
-            config = "{0}/{1}".format(cmd_args.prefix, config)
+            config = f"{cmd_args.prefix}/{config}".format(cmd_args.prefix, config)
         if not os.path.exists(config):
-            print("ERROR: Configuration file {0} does not exist.".format(config))
+            print(f"ERROR: Configuration file {config} does not exist.")
             continue
         # run backup job
         for backup in filter(lambda b: b.enabled, load_backups(config)):
             if cmd_args.server and cmd_args.server != backup.name:
                 if cmd_args.verbose:
-                    verbose_print("Skipping {0}".format(backup.name))
+                    verbose_print(f"Skipping {backup.name}")
                 continue
             with FileLock(lock_file(backup.target)) as lock:
                 if not lock.acquired:
-                    verbose_print("Unable to acquire lock for {0}".format(backup.name))
+                    verbose_print(f"Unable to acquire lock for {backup.name}")
                     continue
-                verbose_print("Starting backup {0}".format(backup.name))
+                verbose_print(f"Starting backup {backup.name}".format(backup.name))
                 backup.run()
