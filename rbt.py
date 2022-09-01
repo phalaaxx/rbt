@@ -18,18 +18,18 @@ import yaml
 
 # ConfigOptions defines possible configuration options
 ConfigOptions = (
-    'name',
-    'user',
-    'template',
-    'target',
-    'backups',
-    'enabled',
-    'files',
-    'exclude',
-    'fakesuper',
-    'chown',
-    'mysql',
-    'bwlimit',
+    "name",
+    "user",
+    "template",
+    "target",
+    "backups",
+    "enabled",
+    "files",
+    "exclude",
+    "fakesuper",
+    "chown",
+    "mysql",
+    "bwlimit",
 )
 
 # BackupProperties defines standard set of backup configuration properties
@@ -45,7 +45,7 @@ def verbose_print(msg: str, *args: list, **kwargs: dict) -> None:
 
 def lock_file(path: str) -> str:
     """Get full path to lock file name"""
-    return '{0}/backup.lock'.format(path)
+    return "{0}/backup.lock".format(path)
 
 
 class FileLock(object):
@@ -56,14 +56,14 @@ class FileLock(object):
         self.name = name
         self.acquired = False
 
-    def __enter__(self) -> 'FileLock':
+    def __enter__(self) -> "FileLock":
         """Acquire lock"""
         if self.acquired:
             return self
         # make sure process is not already running
         if os.path.exists(self.name):
             try:
-                pid = int(open(self.name, 'r').read())
+                pid = int(open(self.name, "r").read())
                 try:
                     os.kill(pid, 0)
                     return self
@@ -72,7 +72,7 @@ class FileLock(object):
             except ValueError:
                 pass
         # acquire lock
-        with open(self.name, 'w+') as fh:
+        with open(self.name, "w+") as fh:
             fh.write(str(os.getpid()))
             self.acquired = True
         return self
@@ -90,26 +90,26 @@ class BackupDir(str):
     @property
     def files(self) -> str:
         """Return full path to files backups directory"""
-        return '{0}/files'.format(self)
+        return "{0}/files".format(self)
 
     @property
     def completed(self) -> str:
         """Get full path to completed file name"""
-        return '{0}/completed'.format(self)
+        return "{0}/completed".format(self)
 
 
-class Backup(collections.namedtuple('Backup', ConfigOptions)):
+class Backup(collections.namedtuple("Backup", ConfigOptions)):
     """Backup object represents a backup job and its properties"""
 
     @property
     def latest_dir(self) -> BackupDir:
         """Get the full path to the directory of the latest backup"""
-        return BackupDir('{0}/backup.0'.format(self.target))
+        return BackupDir("{0}/backup.0".format(self.target))
 
     @property
     def target_dir(self) -> BackupDir:
         """Get the full path to the directory where next backup will go before rotation"""
-        return BackupDir('{0}/backup.{1}'.format(self.target, self.backups))
+        return BackupDir("{0}/backup.{1}".format(self.target, self.backups))
 
     @property
     def username(self) -> str:
@@ -119,33 +119,33 @@ class Backup(collections.namedtuple('Backup', ConfigOptions)):
     @property
     def options(self) -> typing.List[str]:
         """Generate list of options used to start rsync sub-process"""
-        opts = ['/usr/bin/rsync', '-aRH', '--delete', '--stats']
+        opts = ["/usr/bin/rsync", "-aRH", "--delete", "--stats"]
         if self.fakesuper:
-            opts.append('--fake-super')
+            opts.append("--fake-super")
         if self.chown:
-            opts.append('--chown={0}'.format(self.chown))
+            opts.append("--chown={0}".format(self.chown))
         if self.bwlimit:
-            opts.append('--bwlimit={0}'.format(self.bwlimit))
-        opts.append('--link-dest={0}'.format(self.latest_dir.files))
+            opts.append("--bwlimit={0}".format(self.bwlimit))
+        opts.append("--link-dest={0}".format(self.latest_dir.files))
         for include in self.files or []:
-            if self.name == 'localhost':
+            if self.name == "localhost":
                 opts.append(include)
             else:
-                opts.append('{0}@{1}:{2}'.format(self.username, self.name, include))
+                opts.append("{0}@{1}:{2}".format(self.username, self.name, include))
         for exclude in self.exclude or []:
-            opts.append('--exclude={0}'.format(exclude))
+            opts.append("--exclude={0}".format(exclude))
         opts.append(self.target_dir.files)
         return opts
 
     def rotate(self) -> None:
         """Rotate backups to move latest backup in backup.0 directory"""
         # move target backup out of the way by renaming to backup.tmp
-        temp_dir = '{0}/backup.tmp'.format(self.target)
+        temp_dir = "{0}/backup.tmp".format(self.target)
         os.rename(self.target_dir, temp_dir)
         # rotate backups
         for idx in range(self.backups - 1, -1, -1):
-            src = '{0}/backup.{1}'.format(self.target, idx)
-            dst = '{0}/backup.{1}'.format(self.target, idx + 1)
+            src = "{0}/backup.{1}".format(self.target, idx)
+            dst = "{0}/backup.{1}".format(self.target, idx + 1)
             os.rename(src, dst)
         # make target backup last by renaming to backup.0
         os.rename(temp_dir, self.latest_dir)
@@ -154,7 +154,7 @@ class Backup(collections.namedtuple('Backup', ConfigOptions)):
         """Perform backup with rsync, rotate old backups and save stats"""
         # make sure all backup target directories exist
         for idx in range(self.backups):
-            backup_dir = '{0}/backup.{1}'.format(self.target, idx)
+            backup_dir = "{0}/backup.{1}".format(self.target, idx)
             if not os.path.isdir(backup_dir):
                 os.makedirs(backup_dir)
         # get start time for later reference
@@ -162,14 +162,14 @@ class Backup(collections.namedtuple('Backup', ConfigOptions)):
         # make sure there is a target directory for files backups
         if not os.path.isdir(backup.target_dir.files):
             os.makedirs(backup.target_dir.files)
-        verbose_print('Starting command: {0}'.format(' '.join(self.options)))
+        verbose_print("Starting command: {0}".format(" ".join(self.options)))
         rsync = subprocess.run(self.options, stdout=subprocess.PIPE)
         if rsync.returncode not in (0, 24):
-            print('[{0}] Return code {1}'.format(self.name, rsync.returncode))
+            print("[{0}] Return code {1}".format(self.name, rsync.returncode))
             return
         self.rotate()
         # save statistics from the backup job
-        with open(self.latest_dir.completed, 'w+') as fh:
+        with open(self.latest_dir.completed, "w+") as fh:
             data = dict(
                 name=self.name,
                 timestamp=datetime.datetime.now(pytz.timezone(cmd_args.tz)).isoformat(),
@@ -182,16 +182,16 @@ def load_backups(name: str) -> typing.List[Backup]:
     """Load backup specification from the named file and return Backup object"""
     backups = []
     templates = {}
-    with open(name, 'r') as fh:
+    with open(name, "r") as fh:
         for items in yaml.load(fh.read(), Loader=yaml.SafeLoader):
             # parse templates
-            for template in items.get('templates', []):
-                templates[template.get('name')] = template
+            for template in items.get("templates", []):
+                templates[template.get("name")] = template
             # parse backups
-            for backup_item in items.get('servers', []):
+            for backup_item in items.get("servers", []):
                 backup_config = dict(BackupProperties)
-                if backup_item.get('template'):
-                    backup_config.update(templates.get(backup_item.get('template', {})))
+                if backup_item.get("template"):
+                    backup_config.update(templates.get(backup_item.get("template", {})))
                 backup_config.update(**backup_item)
                 for k, v in backup_config.items():
                     if type(v) == str:
@@ -201,40 +201,52 @@ def load_backups(name: str) -> typing.List[Backup]:
 
 
 # main program
-if __name__ == '__main__':
+if __name__ == "__main__":
     # parse command line arguments
     parser = argparse.ArgumentParser(
-        description='Perform rsync based incremental backups')
-    parser.add_argument('--tz', type=str, default='UTC',
-                        help='Current server timezone (default: UTC)')
-    parser.add_argument('--prefix', type=str, default='/etc/rbt',
-                        help='Configuration directory (default: /etc/rbt)')
-    parser.add_argument('--config', type=str, action='append', required=True,
-                        help='Specify one or more configuration files')
-    parser.add_argument('--server', type=str, help='Backup only specified server')
-    parser.add_argument('--verbose', action='store_true',
-                        help='Print debug info to stdout')
+        description="Perform rsync based incremental backups"
+    )
+    parser.add_argument(
+        "--tz", type=str, default="UTC", help="Current server timezone (default: UTC)"
+    )
+    parser.add_argument(
+        "--prefix",
+        type=str,
+        default="/etc/rbt",
+        help="Configuration directory (default: /etc/rbt)",
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        action="append",
+        required=True,
+        help="Specify one or more configuration files",
+    )
+    parser.add_argument("--server", type=str, help="Backup only specified server")
+    parser.add_argument(
+        "--verbose", action="store_true", help="Print debug info to stdout"
+    )
     cmd_args = parser.parse_args()
 
     # walk all configuration files
     for config in cmd_args.config:
         # look for configuration file
-        if not config.endswith('.yaml'):
-            config = '{0}.yaml'.format(config)
+        if not config.endswith(".yaml"):
+            config = "{0}.yaml".format(config)
         if not os.path.exists(config):
-            config = '{0}/{1}'.format(cmd_args.prefix, config)
+            config = "{0}/{1}".format(cmd_args.prefix, config)
         if not os.path.exists(config):
-            print('ERROR: Configuration file {0} does not exist.'.format(config))
+            print("ERROR: Configuration file {0} does not exist.".format(config))
             continue
         # run backup job
         for backup in filter(lambda b: b.enabled, load_backups(config)):
             if cmd_args.server and cmd_args.server != backup.name:
                 if cmd_args.verbose:
-                    verbose_print('Skipping {0}'.format(backup.name))
+                    verbose_print("Skipping {0}".format(backup.name))
                 continue
             with FileLock(lock_file(backup.target)) as lock:
                 if not lock.acquired:
-                    verbose_print('Unable to acquire lock for {0}'.format(backup.name))
+                    verbose_print("Unable to acquire lock for {0}".format(backup.name))
                     continue
-                verbose_print('Starting backup {0}'.format(backup.name))
+                verbose_print("Starting backup {0}".format(backup.name))
                 backup.run()
