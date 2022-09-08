@@ -282,37 +282,6 @@ console_template = jinja2.Template(
 )
 
 
-def parse_rfc3339(dt):
-    """Parse RFC3339 datetime string"""
-
-    def micro(nano: float) -> int:
-        """Convert nanoseconds to microseconds"""
-        micro = nano
-        while micro > 999999:
-            micro = micro // 1000
-        return micro
-
-    parts = re.search(
-        r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\.([0-9]+))?(Z|([+-][0-9]{2}):([0-9]{2}))",
-        dt,
-    )
-
-    return datetime.datetime(
-        year=int(parts.group(1)),
-        month=int(parts.group(2)),
-        day=int(parts.group(3)),
-        hour=int(parts.group(4)),
-        minute=int(parts.group(5)),
-        second=int(parts.group(6)),
-        microsecond=micro(int(parts.group(8))),
-        tzinfo=datetime.timezone(
-            datetime.timedelta(
-                hours=int(parts.group(10) or "0"), minutes=int(parts.group(11) or "0")
-            )
-        ),
-    )
-
-
 def read_comment(basedir: str) -> str:
     """Read comment file"""
     name = os.path.join(basedir, ".comment")
@@ -331,19 +300,20 @@ def read_completed(server: str) -> typing.Optional[typing.List]:
         return Completed(
             str(datetime.timedelta(seconds=int(data.get("duration")))),
             data.get("name"),
-            parse_rfc3339(data.get("timestamp")),
+            datetime.datetime.fromisoformat(data.get("timestamp")),
         )
     return None
 
 
-def get_backup_status(BaseDirList=[]):
+def get_backup_status(args: dict, BaseDirList=[]):
     today = datetime.datetime.now().date()
     resultSet = []
     for server in BaseDirList:
         ServerName = server[8:]
         # ignore unnecessary files
-        if os.path.isfile(os.path.join(server, ".ignore")):
-            continue
+        if not args.all:
+            if os.path.isfile(os.path.join(server, ".ignore")):
+                continue
         # check for status plugin in server backup directory
         plugin = os.path.join(server, "status")
         if os.path.isfile(plugin):
@@ -355,7 +325,7 @@ def get_backup_status(BaseDirList=[]):
                     cmd.stdout.decode().strip().split(":")
                 )
                 if fmt.lower() == "iso":
-                    mtime = parse_rfc3339(mtime_str)
+                    mtime = datetime.datetime.fromisoformat(mtime_str)
                 elif fmt.lower() == "epoch":
                     mtime = datetime.datetime.fromtimestamp(int(mtime_str))
                 else:
@@ -425,16 +395,16 @@ def send_email(Message, Subject, From, To, Server):
     mail.quit()
 
 
-def get_all_data(root: str = "/backup") -> list:
+def get_all_data(args: dict) -> list:
     """Prepare and return server backups data"""
     sections = []
-    for section in os.listdir(root):
-        if not os.path.isdir(f"{root}/{section}"):
+    for section in os.listdir(args.root):
+        if not os.path.isdir(f"{args.root}/{section}"):
             continue
         SectionServers = []
         for server in os.listdir(f"/backup/{section}"):
             SectionServers.append(f"/backup/{section}/{server}")
-        backup_data = get_backup_status(SectionServers)
+        backup_data = get_backup_status(args, SectionServers)
         if len(backup_data):
             sections.append((section, backup_data))
     return sorted(sections, key=lambda item: item[0])
@@ -490,6 +460,11 @@ if __name__ == "__main__":
         help="Email sender address (default: %(default)s)",
     )
     status.add_argument(
+        "--all",
+        action="store_true",
+        help="Show all backups in stats",
+    )
+    status.add_argument(
         "--console",
         action="store_true",
         help="Print statistics on terminal",
@@ -526,7 +501,7 @@ if __name__ == "__main__":
     # smtp is only defined in status subcommand
     elif "smtp" in cmd_args:
         if cmd_args.mailto or cmd_args.console:
-            backup_data = get_all_data(cmd_args.root)
+            backup_data = get_all_data(cmd_args)
         if cmd_args.mailto:
             send_email(
                 email_template.render(sections=backup_data),
