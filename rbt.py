@@ -11,19 +11,18 @@ import json
 import os
 import pwd
 import re
+import smtplib
+import socket
 import subprocess
 import sys
 import time
 import typing
 import urllib.request
-
-import jinja2
-
-import smtplib
-import socket
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.header import Header
+
+import jinja2
 
 
 # backups process
