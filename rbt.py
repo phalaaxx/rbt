@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 
-#
-# apt-get install python3-tz
-#
-
 import argparse
 import collections
 import datetime
