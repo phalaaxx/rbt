@@ -208,7 +208,7 @@ def load_backups(name: str) -> typing.List[Backup]:
 
     if name.startswith("http"):
         req = urllib.request.urlopen(name)
-        data = json.loads(req.read().decode('utf-8'))
+        data = json.loads(req.read().decode("utf-8"))
     else:
         if name.endswith(".json"):
             with open(name, "r") as fh:
