@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 #
-# apt-get install python3-tz python3-yaml
+# apt-get install python3-tz
 #
 
 import argparse
@@ -12,13 +12,13 @@ import os
 import pwd
 import re
 import subprocess
+import sys
 import time
 import typing
 import urllib.request
 
 import jinja2
 import pytz
-import yaml
 
 import smtplib
 import socket
@@ -192,31 +192,32 @@ def load_backups(name: str) -> typing.List[Backup]:
     def parse_backups(data: object) -> typing.List[Backup]:
         backups = []
         templates = {}
-        for items in data:
-            # parse templates
-            for template in items.get("templates", []):
-                templates[template.get("name")] = template
-            # parse backups
-            for backup_item in items.get("servers", []):
-                backup_config = dict(BackupProperties)
-                if backup_item.get("template"):
-                    backup_config.update(templates.get(backup_item.get("template", {})))
-                backup_config.update(**backup_item)
-                for k, v in backup_config.items():
-                    if type(v) == str:
-                        backup_config[k] = str(v).format(**backup_config)
-                backups.append(Backup(**backup_config))
+        # parse templates
+        for template in data.get("templates", []):
+            templates[template.get("name")] = template
+        # parse backups
+        for backup_item in data.get("servers", []):
+            backup_config = dict(BackupProperties)
+            if backup_item.get("template"):
+                backup_config.update(templates.get(backup_item.get("template", {})))
+            backup_config.update(**backup_item)
+            for k, v in backup_config.items():
+                if type(v) == str:
+                    backup_config[k] = str(v).format(**backup_config)
+            backups.append(Backup(**backup_config))
         return backups
 
     if name.startswith("http"):
         req = urllib.request.urlopen(name)
         data = json.loads(req.read().decode('utf-8'))
     else:
-        with open(name, "r") as fh:
-            if name.endswith(".json"):
+        if name.endswith(".json"):
+            with open(name, "r") as fh:
                 data = json.loads(fh.read())
-            if name.endswith(".yml") or name.endswith(".yaml"):
-                data = yaml.load(fh.read(), Loader=yaml.SafeLoader)
+        else:
+            if name.endswith(".py"):
+                name = name.removesuffix(".py")
+            data = __import__(name).config
     return parse_backups(data)
 
 
@@ -511,14 +512,11 @@ if __name__ == "__main__":
 
     # config is only defined in backup subcommand
     if "config" in cmd_args:
+        # add prefix to search path
+        if cmd_args.prefix and os.path.isdir(cmd_args.prefix):
+            sys.path.append(cmd_args.prefix)
         # walk all configuration files
         for config in cmd_args.config:
-            # look for configuration file
-            if not os.path.exists(config):
-                config = f"{cmd_args.prefix}/{config}".format(cmd_args.prefix, config)
-            if not os.path.exists(config):
-                print(f"ERROR: Configuration file {config} does not exist.")
-                continue
             # run backup job
             for backup in filter(lambda b: b.enabled, load_backups(config)):
                 if cmd_args.server and cmd_args.server != backup.name:
