@@ -18,7 +18,6 @@ import typing
 import urllib.request
 
 import jinja2
-import pytz
 
 import smtplib
 import socket
@@ -180,7 +179,7 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
         with open(self.latest_dir.completed, "w+") as fh:
             data = dict(
                 name=self.name,
-                timestamp=datetime.datetime.now(pytz.timezone(cmd_args.tz)).isoformat(),
+                timestamp=datetime.datetime.now().isoformat(),
                 duration=time.time() - start,
             )
             fh.write(json.dumps(data))
@@ -290,24 +289,30 @@ console_template = jinja2.Template(
 
 def parse_rfc3339(dt):
     """Parse RFC3339 datetime string"""
-    broken = re.search(
+
+    def micro(nano: float) -> int:
+        """Convert nanoseconds to microseconds"""
+        micro = nano
+        while micro > 999999:
+            micro = micro // 1000
+        return micro
+
+    parts = re.search(
         r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\.([0-9]+))?(Z|([+-][0-9]{2}):([0-9]{2}))",
         dt,
     )
-    micro = int(broken.group(8))
-    if micro > 999999:
-        micro = micro // 1000
+
     return datetime.datetime(
-        year=int(broken.group(1)),
-        month=int(broken.group(2)),
-        day=int(broken.group(3)),
-        hour=int(broken.group(4)),
-        minute=int(broken.group(5)),
-        second=int(broken.group(6)),
-        microsecond=micro,
+        year=int(parts.group(1)),
+        month=int(parts.group(2)),
+        day=int(parts.group(3)),
+        hour=int(parts.group(4)),
+        minute=int(parts.group(5)),
+        second=int(parts.group(6)),
+        microsecond=micro(int(parts.group(8))),
         tzinfo=datetime.timezone(
             datetime.timedelta(
-                hours=int(broken.group(10) or "0"), minutes=int(broken.group(11) or "0")
+                hours=int(parts.group(10) or "0"), minutes=int(parts.group(11) or "0")
             )
         ),
     )
@@ -451,12 +456,6 @@ if __name__ == "__main__":
     subparser = parser.add_subparsers()
 
     backup = subparser.add_parser("backup", help="Perform servers backups")
-    backup.add_argument(
-        "--tz",
-        type=str,
-        default="UTC",
-        help="Current server timezone (default: %(default)s)",
-    )
     backup.add_argument(
         "--prefix",
         type=str,
