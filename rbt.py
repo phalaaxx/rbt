@@ -183,7 +183,7 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
                 timestamp=datetime.datetime.now(pytz.timezone(cmd_args.tz)).isoformat(),
                 duration=time.time() - start,
             )
-            fh.write(yaml.dump(data, default_flow_style=False))
+            fh.write(json.dumps(data))
 
 
 def load_backups(name: str) -> typing.List[Backup]:
@@ -326,7 +326,7 @@ def read_completed(server: str) -> typing.Optional[typing.List]:
     name = os.path.join(server, "backup.0/completed")
     if os.path.exists(name) and os.path.isfile(name):
         with open(name, "r") as fh:
-            data = yaml.load(fh.read(), Loader=yaml.SafeLoader)
+            data = json.loads(fh.read())
         return Completed(
             str(datetime.timedelta(seconds=int(data.get("duration")))),
             data.get("name"),
