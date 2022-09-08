@@ -7,12 +7,14 @@
 import argparse
 import collections
 import datetime
+import json
 import os
 import pwd
 import re
 import subprocess
 import time
 import typing
+import urllib.request
 
 import jinja2
 import pytz
@@ -185,11 +187,12 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
 
 
 def load_backups(name: str) -> typing.List[Backup]:
-    """Load backup specification from the named file and return Backup object"""
-    backups = []
-    templates = {}
-    with open(name, "r") as fh:
-        for items in yaml.load(fh.read(), Loader=yaml.SafeLoader):
+    """Load backup specification from the specified source and return Backup objecs listt"""
+
+    def parse_backups(data: object) -> typing.List[Backup]:
+        backups = []
+        templates = {}
+        for items in data:
             # parse templates
             for template in items.get("templates", []):
                 templates[template.get("name")] = template
@@ -203,7 +206,18 @@ def load_backups(name: str) -> typing.List[Backup]:
                     if type(v) == str:
                         backup_config[k] = str(v).format(**backup_config)
                 backups.append(Backup(**backup_config))
-    return backups
+        return backups
+
+    if name.startswith("http"):
+        req = urllib.request.urlopen(name)
+        data = json.loads(req.read().decode('utf-8'))
+    else:
+        with open(name, "r") as fh:
+            if name.endswith(".json"):
+                data = json.loads(fh.read())
+            if name.endswith(".yml") or name.endswith(".yaml"):
+                data = yaml.load(fh.read(), Loader=yaml.SafeLoader)
+    return parse_backups(data)
 
 
 # backups stats
@@ -500,8 +514,6 @@ if __name__ == "__main__":
         # walk all configuration files
         for config in cmd_args.config:
             # look for configuration file
-            if not config.endswith(".yaml"):
-                config = f"{config}.yaml"
             if not os.path.exists(config):
                 config = f"{cmd_args.prefix}/{config}".format(cmd_args.prefix, config)
             if not os.path.exists(config):
