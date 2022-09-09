@@ -6,7 +6,6 @@ import datetime
 import json
 import os
 import pwd
-import re
 import smtplib
 import socket
 import subprocess
