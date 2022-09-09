@@ -120,7 +120,12 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
     @property
     def options(self) -> typing.List[str]:
         """Generate list of options used to start rsync sub-process"""
-        opts = ["/usr/bin/rsync", "-aRHS", "--delete", "--stats"]
+        opts = [
+            "/usr/bin/rsync",
+            "-aRHS" if len(self.files or []) > 1 else "-aHS",
+            "--delete",
+            "--stats",
+        ]
         if self.fakesuper:
             opts.append("--fake-super")
         if self.chown:
