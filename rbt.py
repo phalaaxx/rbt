@@ -164,7 +164,7 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
             if not os.path.isdir(backup_dir):
                 os.makedirs(backup_dir)
         # get start time for later reference
-        start = time.time()
+        start = int(time.time())
         # make sure there is a target directory for files backups
         if not os.path.isdir(backup.target_dir.files):
             os.makedirs(backup.target_dir.files)
@@ -179,7 +179,7 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
             data = dict(
                 name=self.name,
                 timestamp=datetime.datetime.now().isoformat(),
-                duration=time.time() - start,
+                duration=int(time.time()) - start,
             )
             fh.write(json.dumps(data))
 
