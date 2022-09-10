@@ -181,7 +181,7 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
                 timestamp=datetime.datetime.now().isoformat(),
                 duration=int(time.time()) - start,
             )
-            fh.write(json.dumps(data))
+            fh.write(json.dumps(data, separators=",:"))
 
 
 def load_backups(name: str) -> typing.List[Backup]:
