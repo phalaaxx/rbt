@@ -6,6 +6,7 @@ import datetime
 import json
 import os
 import pwd
+import re
 import smtplib
 import socket
 import subprocess
@@ -125,6 +126,7 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
             "-aRHS" if len(self.files or []) > 1 else "-aHS",
             "--delete",
             "--stats",
+            "--no-h",
         ]
         if self.fakesuper:
             opts.append("--fake-super")
@@ -175,11 +177,17 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
             return
         self.rotate()
         # save statistics from the backup job
+        re_bytes = re.compile("Total file size: (\\d+) bytes")
+        for line in rsync.stdout.decode("UTF-8").split("\n"):
+            match = re_bytes.match(line)
+            if match:
+                bytes = int(match.group(1))
         with open(self.latest_dir.completed, "w+") as fh:
             data = dict(
                 name=self.name,
                 timestamp=datetime.datetime.now().isoformat(),
                 duration=int(time.time()) - start,
+                bytes=bytes,
             )
             fh.write(json.dumps(data, separators=",:"))
 
@@ -221,7 +229,7 @@ def load_backups(name: str) -> typing.List[Backup]:
 
 # backups stats
 
-Completed = collections.namedtuple("Completed", ("duration", "name", "mtime"))
+Completed = collections.namedtuple("Completed", ("duration", "name", "mtime", "size"))
 
 # backup statuses
 StatusText = {
@@ -247,15 +255,17 @@ email_template = jinja2.Template(
             <td width="200px"><b>Name</b></td>
             <td width="200px"><b>Last</b></td>
             <td width="50px"><b>Duration</b></td>
+            <td width="100px"><b>Size</b></td>
         </tr>
     </thead>
     <tbody>
-    {%- for code, server, mtime, duration, comment in data %}
+    {%- for code, server, mtime, duration, size, comment in data %}
         <tr style="background: #eee">
             <td style="font-weight: bold">[{{ColorStatus(code)}}]</td>
             <td>{{server}}</td>
             <td>{% if mtime %}{{mtime.strftime('%Y/%b/%d %H:%M:%S')}}{% endif %}</td>
             <td>{{duration}}</td>
+            <td>{{size|filesizeformat}}</td>
             {% if comment %}<td>{{comment}}</td>{% endif %}
         </tr>
     {% endfor -%}
@@ -274,12 +284,13 @@ console_template = jinja2.Template(
 {% endmacro %}
 {%- for section, data in sections %}
 \033[01;37mcategory: {{section}}\033[00m
-\033[01;33mStatus {{"{:<50}".format("Name")}}{{"{:<21}".format("Last")}}{{"{:<10}".format("Duration")}}\033[00m
-{%- for code, server, mtime, duration, comment in data %}
+\033[01;33mStatus {{"{:<50}".format("Name")}}{{"{:<22}".format("Last")}}{{"{:<10}".format("Duration")-}}
+{{"{:<10}".format("Size")}}\033[00m
+{%- for code, server, mtime, duration, size, comment in data %}
  {{ColorStatus(code)-}}
  {{"{:<50}".format(server)-}}
- {% if mtime %}{{"{:<21}".format(mtime.strftime('%Y/%b/%d %H:%M:%S'))}}{% else %}{{"{:<21}".format("n/a")}}{% endif -%}
-{{"{:<10}".format(duration)}}{% if comment %}{{comment}}{% endif %}
+ {% if mtime %}{{"{:<22}".format(mtime.strftime('%Y/%b/%d %H:%M:%S'))}}{% else %}{{"{:<21}".format("n/a")}}{% endif -%}
+{{"{:<10}".format(duration)}}{{"{:<10}".format(size|filesizeformat)}}{% if comment %}{{comment}}{% endif %}
 {%- endfor %}
 {% endfor -%}
 """
@@ -305,6 +316,7 @@ def read_completed(server: str) -> typing.Optional[typing.List]:
             str(datetime.timedelta(seconds=int(data.get("duration")))),
             data.get("name"),
             datetime.datetime.fromisoformat(data.get("timestamp")),
+            data.get("bytes", 0),
         )
     return None
 
@@ -325,7 +337,7 @@ def get_backup_status(args: dict, BaseDirList=[]):
             # [OK|ERR|UNK]:[iso|epoch]:<mtime>:{comment}
             cmd = subprocess.run(["/bin/sh", plugin], capture_output=True)
             if cmd.returncode in (0, 1, 2):
-                stat, fmt, mtime_str, duration, comment = (
+                stat, fmt, mtime_str, duration, size, comment = (
                     cmd.stdout.decode().strip().split(":")
                 )
                 if fmt.lower() == "iso":
@@ -337,7 +349,7 @@ def get_backup_status(args: dict, BaseDirList=[]):
                     cmd.returncode = 1
                     mtime = datetime.datetime.now()
                 # save server status
-                resultSet.append((cmd.returncode, ServerName, mtime, duration, comment))
+                resultSet.append((cmd.returncode, ServerName, mtime, duration, int(size), comment))
                 StatusCodes.add(StatusText.get(cmd.returncode))
                 continue
         # retrieve backup status
@@ -350,6 +362,7 @@ def get_backup_status(args: dict, BaseDirList=[]):
                         ServerName,
                         completed.mtime,
                         completed.duration,
+                        completed.size,
                         read_comment(server),
                     )
                 )
@@ -361,12 +374,13 @@ def get_backup_status(args: dict, BaseDirList=[]):
                         ServerName,
                         completed.mtime,
                         completed.duration,
+                        completed.size,
                         read_comment(server),
                     )
                 )
                 StatusCodes.add(StatusText.get(1))
             continue
-        resultSet.append((2, ServerName, None, "n/a", read_comment(server)))
+        resultSet.append((2, ServerName, None, "n/a", 0, read_comment(server)))
         StatusCodes.add(StatusText.get(2))
 
     # sort by status
