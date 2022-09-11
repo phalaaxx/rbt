@@ -177,17 +177,17 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
             return
         self.rotate()
         # save statistics from the backup job
-        re_bytes = re.compile("Total file size: (\\d+) bytes")
+        re_size = re.compile("Total file size: (\\d+) bytes")
         for line in rsync.stdout.decode("UTF-8").split("\n"):
-            match = re_bytes.match(line)
+            match = re_size.match(line)
             if match:
-                bytes = int(match.group(1))
+                size = int(match.group(1))
         with open(self.latest_dir.completed, "w+") as fh:
             data = dict(
                 name=self.name,
                 timestamp=datetime.datetime.now().isoformat(),
                 duration=int(time.time()) - start,
-                bytes=bytes,
+                size=size,
             )
             fh.write(json.dumps(data, separators=",:"))
 
@@ -316,7 +316,7 @@ def read_completed(server: str) -> typing.Optional[typing.List]:
             str(datetime.timedelta(seconds=int(data.get("duration")))),
             data.get("name"),
             datetime.datetime.fromisoformat(data.get("timestamp")),
-            data.get("bytes", 0),
+            data.get("size", 0),
         )
     return None
 
@@ -349,7 +349,9 @@ def get_backup_status(args: dict, BaseDirList=[]):
                     cmd.returncode = 1
                     mtime = datetime.datetime.now()
                 # save server status
-                resultSet.append((cmd.returncode, ServerName, mtime, duration, int(size), comment))
+                resultSet.append(
+                    (cmd.returncode, ServerName, mtime, duration, int(size), comment)
+                )
                 StatusCodes.add(StatusText.get(cmd.returncode))
                 continue
         # retrieve backup status
