@@ -229,7 +229,9 @@ def load_backups(name: str) -> typing.List[Backup]:
 
 # backups stats
 
-Completed = collections.namedtuple("Completed", ("duration", "name", "mtime", "size"))
+BackupStatus = collections.namedtuple(
+    "BackupStatus", ("name", "status", "mtime", "duration", "size", "comment")
+)
 
 # backup statuses
 StatusText = {
@@ -259,10 +261,10 @@ email_template = jinja2.Template(
         </tr>
     </thead>
     <tbody>
-    {%- for code, server, mtime, duration, size, comment in data %}
+    {%- for name, status, mtime, duration, size, comment in data %}
         <tr style="background: #eee">
-            <td style="font-weight: bold">[{{ColorStatus(code)}}]</td>
-            <td>{{server}}</td>
+            <td style="font-weight: bold">[{{ColorStatus(status)}}]</td>
+            <td>{{name}}</td>
             <td>{% if mtime %}{{mtime.strftime('%Y/%b/%d %H:%M:%S')}}{% endif %}</td>
             <td>{{duration}}</td>
             <td>{{size|filesizeformat}}</td>
@@ -286,9 +288,9 @@ console_template = jinja2.Template(
 \033[01;37mcategory: {{section}}\033[00m
 \033[01;33mStatus {{"{:<50}".format("Name")}}{{"{:<22}".format("Last")}}{{"{:<10}".format("Duration")-}}
 {{"{:<10}".format("Size")}}\033[00m
-{%- for code, server, mtime, duration, size, comment in data %}
- {{ColorStatus(code)-}}
- {{"{:<50}".format(server)-}}
+{%- for name, status, mtime, duration, size, comment in data %}
+ {{ColorStatus(status)-}}
+ {{"{:<50}".format(name)-}}
  {% if mtime %}{{"{:<22}".format(mtime.strftime('%Y/%b/%d %H:%M:%S'))}}{% else %}{{"{:<21}".format("n/a")}}{% endif -%}
 {{"{:<10}".format(duration)}}{{"{:<10}".format(size|filesizeformat)}}{% if comment %}{{comment}}{% endif %}
 {%- endfor %}
@@ -306,24 +308,28 @@ def read_comment(basedir: str) -> str:
         return fh.read().strip()
 
 
-def read_completed(server: str) -> typing.Optional[typing.List]:
+def read_completed(path: str, today: object) -> typing.Optional[typing.List]:
     """Read completed file"""
-    name = os.path.join(server, "backup.0/completed")
+    name = os.path.join(path, "backup.0/completed")
+    backup_name = os.path.basename(path)
     if os.path.exists(name) and os.path.isfile(name):
         with open(name, "r") as fh:
             data = json.loads(fh.read())
-        return Completed(
-            str(datetime.timedelta(seconds=int(data.get("duration")))),
-            data.get("name"),
-            datetime.datetime.fromisoformat(data.get("timestamp")),
-            data.get("size", 0),
+        mtime = datetime.datetime.fromisoformat(data.get("timestamp"))
+        return BackupStatus(
+            name=data.get("name", backup_name),
+            status=0 if mtime.date() == today else 1,
+            mtime=mtime,
+            duration=str(datetime.timedelta(seconds=int(data.get("duration")))),
+            size=data.get("size", 0),
+            comment=read_comment(path),
         )
-    return None
+    return BackupStatus(backup_name, 2, None, "n/a", 0, read_comment(path))
 
 
 def get_backup_status(args: dict, BaseDirList=[]):
     today = datetime.datetime.now().date()
-    resultSet = []
+    result_set = []
     for server in BaseDirList:
         ServerName = server[8:]
         # ignore unnecessary files
@@ -349,45 +355,20 @@ def get_backup_status(args: dict, BaseDirList=[]):
                     cmd.returncode = 1
                     mtime = datetime.datetime.now()
                 # save server status
-                resultSet.append(
-                    (cmd.returncode, ServerName, mtime, duration, int(size), comment)
+                result_set.append(
+                    BackupStatus(
+                        cmd.returncode, ServerName, mtime, duration, int(size), comment
+                    )
                 )
                 StatusCodes.add(StatusText.get(cmd.returncode))
                 continue
         # retrieve backup status
-        completed = read_completed(server)
-        if completed:
-            if completed.mtime.date() == today:
-                resultSet.append(
-                    (
-                        0,
-                        ServerName,
-                        completed.mtime,
-                        completed.duration,
-                        completed.size,
-                        read_comment(server),
-                    )
-                )
-                StatusCodes.add(StatusText.get(0))
-            else:
-                resultSet.append(
-                    (
-                        1,
-                        ServerName,
-                        completed.mtime,
-                        completed.duration,
-                        completed.size,
-                        read_comment(server),
-                    )
-                )
-                StatusCodes.add(StatusText.get(1))
-            continue
-        resultSet.append((2, ServerName, None, "n/a", 0, read_comment(server)))
-        StatusCodes.add(StatusText.get(2))
+        completed = read_completed(server, today)
+        result_set.append(completed)
+        StatusCodes.add(StatusText.get(completed.status, "ERROR"))
 
     # sort by status
-    resultSet.sort(reverse=True)
-    return resultSet
+    return sorted(result_set, key=lambda item: item.status, reverse=True)
 
 
 def send_email(Message, Subject, From, To, Server):
