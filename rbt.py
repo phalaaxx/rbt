@@ -358,7 +358,7 @@ def get_backup_status(args: dict, BaseDirList=[]):
                 # save server status
                 result_set.append(
                     BackupStatus(
-                        cmd.returncode, ServerName, mtime, duration, int(size), comment
+                        ServerName, cmd.returncode, mtime, duration, int(size), comment
                     )
                 )
                 StatusCodes.add(StatusText.get(cmd.returncode))
