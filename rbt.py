@@ -26,6 +26,7 @@ import jinja2
 # ConfigOptions defines possible configuration options
 ConfigOptions = (
     "name",
+    "address",
     "user",
     "template",
     "target",
@@ -139,7 +140,7 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
             if self.name == "localhost":
                 opts.append(include)
             else:
-                opts.append(f"{self.username}@{self.name}:{include}")
+                opts.append(f"{self.username}@{self.address or self.name}:{include}")
         for exclude in self.exclude or []:
             opts.append(f"--exclude={exclude}")
         opts.append(self.target_dir.files)
