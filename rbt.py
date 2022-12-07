@@ -292,7 +292,7 @@ console_template = jinja2.Template(
 {%- for name, status, mtime, duration, size, comment in data %}
  {{ColorStatus(status)-}}
  {{"{:<50}".format(name)-}}
- {% if mtime %}{{"{:<22}".format(mtime.strftime('%Y/%b/%d %H:%M:%S'))}}{% else %}{{"{:<21}".format("n/a")}}{% endif -%}
+ {% if mtime %}{{"{:<22}".format(mtime.strftime('%Y/%b/%d %H:%M:%S'))}}{% else %}{{"{:<22}".format("n/a")}}{% endif -%}
 {{"{:<10}".format(duration)}}{{"{:<10}".format(size|filesizeformat)}}{% if comment %}{{comment}}{% endif %}
 {%- endfor %}
 {% endfor -%}
