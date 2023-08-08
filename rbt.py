@@ -159,7 +159,23 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
         # make target backup last by renaming to backup.0
         os.rename(temp_dir, self.latest_dir)
 
-    def run(self) -> None:
+    def update(self, endpoint: str, data: dict):
+        """Update backup status to API endpoint"""
+        req = urllib.request.Request(
+            endpoint,
+            data=data.encode("UTF-8"),
+            method="POST",
+            headers={
+                "Content-Type": "application/json",
+            },
+        )
+        try:
+            urllib.request.urlopen(req)
+        except urllib.error.HTTPError:
+            # ignore http errors
+            pass
+
+    def run(self, status: str = None) -> None:
         """Perform backup with rsync, rotate old backups and save stats"""
         # make sure all backup target directories exist
         for idx in range(self.backups):
@@ -190,7 +206,10 @@ class Backup(collections.namedtuple("Backup", ConfigOptions)):
                 duration=int(time.time()) - start,
                 size=size,
             )
-            fh.write(json.dumps(data, separators=",:"))
+            json_data = json.dumps(data, separators=",:")
+            fh.write(json_data)
+            if status:
+                self.update(status, json_data)
 
 
 def load_backups(name: str) -> typing.List[Backup]:
@@ -499,7 +518,10 @@ if __name__ == "__main__":
                         verbose_print(f"Unable to acquire lock for {backup.name}")
                         continue
                     verbose_print(f"Starting backup {backup.name}".format(backup.name))
-                    backup.run()
+                    if config.startswith("http"):
+                        backup.run(config)
+                    else:
+                        backup.run()
     # smtp is only defined in status subcommand
     elif "smtp" in cmd_args:
         if cmd_args.mailto or cmd_args.console:
@@ -507,10 +529,10 @@ if __name__ == "__main__":
         if cmd_args.mailto:
             send_email(
                 email_template.render(sections=backup_data),
-                "Servers Backups Status",
-                "status@backup1.cloxter.net",
-                cmd_args.mailto,
-                cmd_args.smtp,
+                getattr(cmd_args, "subject"),
+                getattr(cmd_args, "from"),
+                getattr(cmd_args, "mailto"),
+                getattr(cmd_args, "smtp"),
             )
         if cmd_args.console:
             print(console_template.render(sections=backup_data))
