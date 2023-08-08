@@ -387,8 +387,16 @@ def get_backup_status(args: dict, BaseDirList=[]):
         result_set.append(completed)
         StatusCodes.add(StatusText.get(completed.status, "ERROR"))
 
-    # sort by status
-    return sorted(result_set, key=lambda item: item.status, reverse=True)
+    # double sort by status and name
+    return sorted(
+        sorted(
+            result_set,
+            key=lambda item: item.name,
+            reverse=False,
+        ),
+        key=lambda item: item.status,
+        reverse=True,
+    )
 
 
 def send_email(Message, Subject, From, To, Server):
