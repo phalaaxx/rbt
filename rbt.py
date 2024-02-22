@@ -334,7 +334,13 @@ def read_completed(path: str, today: object) -> typing.Optional[typing.List]:
     backup_name = os.path.basename(path)
     if os.path.exists(name) and os.path.isfile(name):
         with open(name, "r") as fh:
-            data = json.loads(fh.read())
+            try:
+                data = json.loads(fh.read())
+            except json.JSONDecodeError as e:
+                data = dict(
+                    timestamp="1970-01-01T00:00:00.00",
+                    duration=0,
+                )
         mtime = datetime.datetime.fromisoformat(data.get("timestamp"))
         return BackupStatus(
             name=data.get("name", backup_name),
